@@ -1,8 +1,90 @@
-from flask import Flask, request, redirect, url_for, session
+from flask import Flask, request, redirect, session
 import os
 
 app = Flask(__name__)
 app.secret_key = "secret"
+
+# ---------------------------
+# UI TEMPLATE
+# ---------------------------
+def render_page(content):
+    return f"""
+    <html>
+    <head>
+        <title>Co-op System</title>
+        <style>
+            body {{
+                margin: 0;
+                height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                background: radial-gradient(circle at top, #1f1f1f, #0a0a0a);
+                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                color: white;
+            }}
+
+            .card {{
+                background: #1f1f1f;
+                padding: 30px;
+                border-radius: 16px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                width: 90%;
+                max-width: 420px;
+                text-align: center;
+                backdrop-filter: blur(10px);
+            }}
+
+            input, textarea {{
+                width: 100%;
+                padding: 10px;
+                margin: 8px 0;
+                border-radius: 8px;
+                border: none;
+                background: #2a2a2a;
+                color: white;
+            }}
+
+            button {{
+                width: 100%;
+                padding: 10px;
+                border: none;
+                border-radius: 8px;
+                background: #4CAF50;
+                color: white;
+                cursor: pointer;
+                font-weight: bold;
+            }}
+
+            button:hover {{
+                background: #45a049;
+            }}
+
+            a {{
+                color: #4da6ff;
+                text-decoration: none;
+            }}
+
+            a:hover {{
+                text-decoration: underline;
+            }}
+
+            .box {{
+                border: 1px solid #444;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 10px;
+                text-align: left;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            {content}
+        </div>
+    </body>
+    </html>
+    """
 
 # ---------------------------
 # STORAGE
@@ -16,7 +98,7 @@ users = {
 }
 
 UPLOAD_FOLDER = "uploads"
-MAX_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_SIZE = 5 * 1024 * 1024
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -26,10 +108,10 @@ if not os.path.exists(UPLOAD_FOLDER):
 # ---------------------------
 @app.route("/")
 def home():
-    return '''
+    return render_page("""
         <h1>Co-op Application System</h1>
         <a href="/login">Login</a>
-    '''
+    """)
 
 # ---------------------------
 # LOGIN
@@ -52,16 +134,16 @@ def login():
             else:
                 return redirect("/supervisor")
 
-        return "Invalid login"
+        return render_page("<p>Invalid login</p><a href='/login'>Try again</a>")
 
-    return '''
+    return render_page("""
         <h2>Login</h2>
         <form method="post">
-            Email: <input name="email"><br>
-            Password: <input name="password"><br><br>
+            <input name="email" placeholder="Email">
+            <input name="password" type="password" placeholder="Password">
             <button type="submit">Login</button>
         </form>
-    '''
+    """)
 
 # ---------------------------
 # STUDENT
@@ -78,20 +160,20 @@ def student():
         file = request.files.get("report")
 
         if not name or not sid or not email:
-            return "Error: Fill all fields"
+            return render_page("<p>Error: Fill all fields</p>")
 
         report_filename = None
 
         if file and file.filename:
             if not file.filename.lower().endswith(".pdf"):
-                return "Error: Only PDF files allowed"
+                return render_page("<p>Error: Only PDF files allowed</p>")
 
             file.seek(0, os.SEEK_END)
             size = file.tell()
             file.seek(0)
 
             if size > MAX_SIZE:
-                return "Error: File too large (max 5MB)"
+                return render_page("<p>Error: File too large</p>")
 
             filepath = os.path.join(UPLOAD_FOLDER, file.filename)
             file.save(filepath)
@@ -107,27 +189,27 @@ def student():
             "evaluation": None
         })
 
-        return "<p>Application Submitted!</p><a href='/student'>Back</a>"
+        return render_page("<p>Application Submitted!</p><a href='/student'>Back</a>")
 
-    return '''
+    return render_page("""
         <h2>Student Portal</h2>
 
         <form method="post" enctype="multipart/form-data">
-            Name: <input name="name"><br>
-            Student ID: <input name="id"><br>
-            Email: <input name="email"><br>
-            Report (PDF): <input type="file" name="report"><br><br>
+            <input name="name" placeholder="Name">
+            <input name="id" placeholder="Student ID">
+            <input name="email" placeholder="Email">
+            <input type="file" name="report">
             <button type="submit">Apply</button>
         </form>
 
         <h3>Check Status</h3>
         <form action="/status" method="post">
-            Student ID: <input name="id">
+            <input name="id" placeholder="Student ID">
             <button type="submit">View Status</button>
         </form>
 
         <br><a href="/">Home</a>
-    '''
+    """)
 
 # ---------------------------
 # STATUS
@@ -138,15 +220,15 @@ def status():
 
     for app_data in applications:
         if app_data["id"] == sid:
-            return f"""
+            return render_page(f"""
                 <p>Provisional: {app_data['status']}</p>
                 <p>Final: {app_data['final']}</p>
                 <p>Report Uploaded: {"Yes" if app_data["report"] else "No"}</p>
                 <p>Evaluation Submitted: {"Yes" if app_data["evaluation"] else "No"}</p>
                 <a href="/">Home</a>
-            """
+            """)
 
-    return "Student not found"
+    return render_page("<p>Student not found</p>")
 
 # ---------------------------
 # COORDINATOR
@@ -177,7 +259,7 @@ def coordinator():
 
     for i, app_data in enumerate(apps):
         html += f"""
-        <div style='border:1px solid black; padding:10px; margin:10px;'>
+        <div class="box">
             <p>{app_data['name']} ({app_data['id']})</p>
             <p>Status: {app_data['status']}</p>
             <p>Final: {app_data['final']}</p>
@@ -190,10 +272,10 @@ def coordinator():
         """
 
     html += "<br><a href='/'>Home</a>"
-    return html
+    return render_page(html)
 
 # ---------------------------
-# UPDATE STATUS
+# UPDATE
 # ---------------------------
 @app.route("/update/<int:index>/<action>")
 def update(index, action):
@@ -227,20 +309,19 @@ def supervisor():
         for app_data in applications:
             if app_data["id"] == sid:
                 app_data["evaluation"] = feedback
-                return "Evaluation Submitted"
+                return render_page("<p>Evaluation Submitted</p>")
 
-        return "Student not found"
+        return render_page("<p>Student not found</p>")
 
-    return '''
+    return render_page("""
         <h2>Supervisor Portal</h2>
         <form method="post">
-            Student ID: <input name="id"><br>
-            Feedback:<br>
-            <textarea name="feedback"></textarea><br><br>
+            <input name="id" placeholder="Student ID">
+            <textarea name="feedback" placeholder="Feedback"></textarea>
             <button type="submit">Submit</button>
         </form>
         <br><a href="/">Home</a>
-    '''
+    """)
 
 # ---------------------------
 # RUN
